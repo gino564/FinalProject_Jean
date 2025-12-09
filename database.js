@@ -1,14 +1,25 @@
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'tattoo_studio.db'));
-
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
+let db;
+const dbPath = path.join(__dirname, 'tattoo_studio.db');
 
 // Initialize database tables
-function initializeDatabase() {
+async function initializeDatabase() {
+  const SQL = await initSqlJs();
+
+  // Load existing database or create new one
+  let buffer;
+  if (fs.existsSync(dbPath)) {
+    buffer = fs.readFileSync(dbPath);
+    db = new SQL.Database(buffer);
+    console.log('Database loaded from file');
+  } else {
+    db = new SQL.Database();
+    console.log('New database created');
+  }
   // Users table
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -79,18 +90,20 @@ function initializeDatabase() {
   `);
 
   // Insert default admin user (password: admin123)
-  const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-  if (!adminExists) {
+  const adminCheck = db.exec('SELECT id FROM users WHERE username = "admin"');
+  if (adminCheck.length === 0 || adminCheck[0].values.length === 0) {
     const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
-      INSERT INTO users (username, email, password, first_name, last_name, role)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run('admin', 'admin@jinktattoo.com', hashedPassword, 'Admin', 'User', 'admin');
+    db.run(
+      'INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)',
+      ['admin', 'admin@jinktattoo.com', hashedPassword, 'Admin', 'User', 'admin']
+    );
     console.log('Default admin created (username: admin, password: admin123)');
   }
 
   // Insert sample artists
-  const artistCount = db.prepare('SELECT COUNT(*) as count FROM artists').get().count;
+  const artistCheck = db.exec('SELECT COUNT(*) as count FROM artists');
+  const artistCount = artistCheck[0]?.values[0]?.[0] || 0;
+
   if (artistCount === 0) {
     const artists = [
       ['Mike Shadow', 'Specialist in dark realism and portraits', 'Realism', '/images/artists/mike.jpg'],
@@ -99,13 +112,16 @@ function initializeDatabase() {
       ['Luna Rose', 'Specialist in fine line and watercolor tattoos', 'Watercolor', '/images/artists/luna.jpg']
     ];
 
-    const insertArtist = db.prepare('INSERT INTO artists (name, bio, specialization, image_url) VALUES (?, ?, ?, ?)');
-    artists.forEach(artist => insertArtist.run(...artist));
+    artists.forEach(artist => {
+      db.run('INSERT INTO artists (name, bio, specialization, image_url) VALUES (?, ?, ?, ?)', artist);
+    });
     console.log('Sample artists inserted');
   }
 
   // Insert sample tattoo designs
-  const tattooCount = db.prepare('SELECT COUNT(*) as count FROM tattoos').get().count;
+  const tattooCheck = db.exec('SELECT COUNT(*) as count FROM tattoos');
+  const tattooCount = tattooCheck[0]?.values[0]?.[0] || 0;
+
   if (tattooCount === 0) {
     const tattoos = [
       ['Dragon Sleeve', 'Arm', 'Traditional Japanese dragon design for full sleeve', '/images/tattoos/dragon.jpg'],
@@ -118,15 +134,80 @@ function initializeDatabase() {
       ['Butterfly Wrist', 'Wrist', 'Delicate butterfly design', '/images/tattoos/butterfly.jpg']
     ];
 
-    const insertTattoo = db.prepare('INSERT INTO tattoos (title, category, description, image_url) VALUES (?, ?, ?, ?)');
-    tattoos.forEach(tattoo => insertTattoo.run(...tattoo));
+    tattoos.forEach(tattoo => {
+      db.run('INSERT INTO tattoos (title, category, description, image_url) VALUES (?, ?, ?, ?)', tattoo);
+    });
     console.log('Sample tattoo designs inserted');
   }
+
+  // Save database to file
+  saveDatabase();
 
   console.log('Database initialized successfully');
 }
 
-// Initialize the database
-initializeDatabase();
+// Save database to file
+function saveDatabase() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
+}
 
-module.exports = db;
+// Wrapper functions for compatibility with better-sqlite3 API
+const dbWrapper = {
+  prepare: (sql) => {
+    return {
+      run: (...params) => {
+        const stmt = db.prepare(sql);
+        stmt.bind(params);
+        stmt.step();
+        const lastInsertRowid = db.exec('SELECT last_insert_rowid()')[0]?.values[0]?.[0] || 0;
+        stmt.free();
+        saveDatabase();
+        return { lastInsertRowid };
+      },
+      get: (...params) => {
+        const stmt = db.prepare(sql);
+        stmt.bind(params);
+        const result = stmt.step() ? stmt.getAsObject() : null;
+        stmt.free();
+        return result;
+      },
+      all: (...params) => {
+        const stmt = db.prepare(sql);
+        stmt.bind(params);
+        const results = [];
+        while (stmt.step()) {
+          results.push(stmt.getAsObject());
+        }
+        stmt.free();
+        return results;
+      }
+    };
+  },
+  exec: (sql) => {
+    db.run(sql);
+    saveDatabase();
+  }
+};
+
+// Initialize the database
+let dbReady = false;
+initializeDatabase().then(() => {
+  dbReady = true;
+}).catch(err => {
+  console.error('Database initialization failed:', err);
+  process.exit(1);
+});
+
+// Export a proxy that waits for database to be ready
+module.exports = new Proxy({}, {
+  get: (target, prop) => {
+    if (!dbReady || !db) {
+      throw new Error('Database not initialized yet. Please wait for initialization to complete.');
+    }
+    return dbWrapper[prop];
+  }
+});

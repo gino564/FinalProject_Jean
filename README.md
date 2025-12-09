@@ -46,6 +46,8 @@ A complete tattoo appointment website system with a dark theme and gold accents.
 - Node.js (v14 or higher)
 - npm (v6 or higher)
 
+**Note**: This version uses `sql.js` (pure JavaScript SQLite) instead of `better-sqlite3`, so it works on **Windows without requiring Visual Studio Build Tools** or any C++ compilation!
+
 ## 🛠️ Installation
 
 1. **Clone the repository**
