@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK</a>
+    <ul class="navbar-menu">
+      <li><a href="/user-dashboard.html" class="active">Dashboard</a></li>
+      <li><a href="/gallery.html">Browse Tattoos</a></li>
+      <li><a href="/my-appointments.html">My Appointments</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/user-dashboard.html" class="active">🏠 Dashboard</a></li>
+        <li><a href="/gallery.html">🎨 Browse Tattoos</a></li>
+        <li><a href="/appointment.html">📅 Make Appointment</a></li>
+        <li><a href="/my-appointments.html">📋 My Appointments</a></li>
+        <li><a href="/notifications.html">🔔 Notifications <span class="notification-badge" id="notifBadge" style="display: none;">0</span></a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Welcome, <span id="userName">User</span>!</h1>
+        <p style="color: #aaa;">Explore our tattoo styles and book your next appointment</p>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <h2 class="card-title">Quick Actions</h2>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <a href="/gallery.html" class="btn btn-primary">Browse Tattoo Gallery</a>
+          <a href="/appointment.html" class="btn btn-secondary">Book New Appointment</a>
+          <a href="/my-appointments.html" class="btn btn-secondary">View My Appointments</a>
+        </div>
+      </div>
+
+      <!-- Recent Appointments -->
+      <div class="card">
+        <h2 class="card-title">Recent Appointments</h2>
+        <div id="recentAppointments">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <!-- About Our Services -->
+      <div class="card-grid">
+        <div class="card">
+          <h3 style="color: var(--gold); margin-bottom: 1rem;">🎨 Custom Designs</h3>
+          <p style="color: #aaa;">Upload your own design or work with our artists to create something unique.</p>
+        </div>
+        <div class="card">
+          <h3 style="color: var(--gold); margin-bottom: 1rem;">👨‍🎨 Expert Artists</h3>
+          <p style="color: #aaa;">Our talented artists specialize in various styles from traditional to modern.</p>
+        </div>
+        <div class="card">
+          <h3 style="color: var(--gold); margin-bottom: 1rem;">🏥 Hygiene Standards</h3>
+          <p style="color: #aaa;">We maintain the highest standards of cleanliness and safety.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // Check authentication
+    checkAuth();
+
+    // Load user data
+    async function loadUserData() {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const user = await response.json();
+          document.getElementById('userName').textContent = user.first_name;
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      }
+    }
+
+    // Load recent appointments
+    async function loadRecentAppointments() {
+      try {
+        const response = await fetch('/api/appointments/my');
+        const appointments = await response.json();
+
+        const container = document.getElementById('recentAppointments');
+
+        if (appointments.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📅</div>
+              <div class="empty-state-text">No appointments yet</div>
+              <a href="/appointment.html" class="btn btn-primary">Book Your First Appointment</a>
+            </div>
+          `;
+        } else {
+          const recentAppts = appointments.slice(0, 3);
+          container.innerHTML = `
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Artist</th>
+                    <th>Tattoo</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentAppts.map(appt => `
+                    <tr>
+                      <td>${new Date(appt.appointment_date).toLocaleDateString()}</td>
+                      <td>${appt.appointment_time}</td>
+                      <td>${appt.artist_name}</td>
+                      <td>${appt.tattoo_title || 'Custom Design'}</td>
+                      <td><span class="status-badge status-${appt.status}">${appt.status}</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        document.getElementById('recentAppointments').innerHTML = '<p style="color: #dc3545;">Failed to load appointments</p>';
+      }
+    }
+
+    // Load notifications count
+    async function loadNotificationsCount() {
+      try {
+        const response = await fetch('/api/notifications');
+        const notifications = await response.json();
+        const unreadCount = notifications.filter(n => !n.is_read).length;
+
+        if (unreadCount > 0) {
+          const badge = document.getElementById('notifBadge');
+          badge.textContent = unreadCount;
+          badge.style.display = 'inline-block';
+        }
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+      }
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    // Initialize
+    loadUserData();
+    loadRecentAppointments();
+    loadNotificationsCount();
+  </script>
+</body>
+</html>

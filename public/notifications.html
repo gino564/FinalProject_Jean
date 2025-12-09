@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK</a>
+    <ul class="navbar-menu">
+      <li><a href="/user-dashboard.html">Dashboard</a></li>
+      <li><a href="/gallery.html">Browse Tattoos</a></li>
+      <li><a href="/my-appointments.html">My Appointments</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/user-dashboard.html">🏠 Dashboard</a></li>
+        <li><a href="/gallery.html">🎨 Browse Tattoos</a></li>
+        <li><a href="/appointment.html">📅 Make Appointment</a></li>
+        <li><a href="/my-appointments.html">📋 My Appointments</a></li>
+        <li><a href="/notifications.html" class="active">🔔 Notifications</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Notifications</h1>
+        <p style="color: #aaa;">Stay updated with your appointment status</p>
+      </div>
+
+      <div class="card">
+        <div id="notificationsList">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAuth();
+
+    // Load notifications
+    async function loadNotifications() {
+      try {
+        const response = await fetch('/api/notifications');
+        const notifications = await response.json();
+
+        const container = document.getElementById('notificationsList');
+
+        if (notifications.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🔔</div>
+              <div class="empty-state-text">No notifications yet</div>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = notifications.map(notif => `
+          <div class="notification-item ${notif.is_read ? '' : 'unread'}" data-id="${notif.id}" onclick="markAsRead(${notif.id})">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div>
+                <p style="margin-bottom: 0.5rem;">${notif.message}</p>
+                <small style="color: #888;">${new Date(notif.created_at).toLocaleString()}</small>
+              </div>
+              ${notif.is_read ? '' : '<div style="color: var(--gold); font-weight: 700; font-size: 0.85rem;">NEW</div>'}
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+        document.getElementById('notificationsList').innerHTML = '<p style="color: #dc3545;">Failed to load notifications</p>';
+      }
+    }
+
+    // Mark notification as read
+    async function markAsRead(id) {
+      try {
+        await fetch(`/api/notifications/${id}/read`, { method: 'PUT' });
+        loadNotifications(); // Reload to update UI
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    // Initialize
+    loadNotifications();
+  </script>
+</body>
+</html>

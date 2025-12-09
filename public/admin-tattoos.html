@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Tattoo Designs - J'INK Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK Admin</a>
+    <ul class="navbar-menu">
+      <li><a href="/admin-dashboard.html">Admin Dashboard</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/admin-dashboard.html">📊 Dashboard</a></li>
+        <li><a href="/admin-appointments.html">📅 Appointments</a></li>
+        <li><a href="/admin-tattoos.html" class="active">🎨 Tattoo Designs</a></li>
+        <li><a href="/admin-artists.html">👨‍🎨 Artists</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Manage Tattoo Designs</h1>
+        <p style="color: #aaa;">Add, edit, or remove tattoo designs from the gallery</p>
+      </div>
+
+      <!-- Add New Tattoo Button -->
+      <div class="card">
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add New Tattoo Design</button>
+      </div>
+
+      <!-- Tattoos Grid -->
+      <div id="tattoosGrid">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="tattooModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h2 class="modal-title" id="modalTitle">Add New Tattoo</h2>
+
+      <form id="tattooForm" enctype="multipart/form-data">
+        <input type="hidden" id="tattooId">
+
+        <div class="form-group">
+          <label for="title">Tattoo Title</label>
+          <input type="text" id="title" name="title" class="form-control" placeholder="e.g., Dragon Sleeve" required>
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category" name="category" class="form-control" required>
+            <option value="">-- Select Category --</option>
+            <option value="Arm">Arm</option>
+            <option value="Back">Back</option>
+            <option value="Chest">Chest</option>
+            <option value="Shoulder">Shoulder</option>
+            <option value="Leg">Leg</option>
+            <option value="Wrist">Wrist</option>
+            <option value="Neck">Neck</option>
+            <option value="Full Body">Full Body</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" class="form-control" rows="3" placeholder="Describe the tattoo design..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Tattoo Image</label>
+          <div class="file-upload">
+            <input type="file" id="image" name="image" accept="image/*">
+            <label for="image" class="file-upload-label">
+              <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
+              <div>Click to upload tattoo image</div>
+              <small style="color: #888; margin-top: 0.5rem; display: block;">Supports: JPG, PNG, GIF (Max 5MB)</small>
+            </label>
+          </div>
+          <div id="imagePreview" style="display: none; text-align: center; margin-top: 1rem;">
+            <img id="previewImg" class="file-preview" alt="Preview">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save Tattoo</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAdminAuth();
+
+    let tattoos = [];
+    let isEditMode = false;
+
+    // Load tattoos
+    async function loadTattoos() {
+      try {
+        const response = await fetch('/api/tattoos');
+        tattoos = await response.json();
+        displayTattoos();
+      } catch (error) {
+        console.error('Error loading tattoos:', error);
+        document.getElementById('tattoosGrid').innerHTML = '<p style="color: #dc3545;">Failed to load tattoos</p>';
+      }
+    }
+
+    // Display tattoos
+    function displayTattoos() {
+      const container = document.getElementById('tattoosGrid');
+
+      if (tattoos.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎨</div>
+            <div class="empty-state-text">No tattoo designs yet</div>
+            <button class="btn btn-primary" onclick="openAddModal()">Add Your First Design</button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="tattoo-grid">
+          ${tattoos.map(tattoo => `
+            <div class="tattoo-card">
+              <img src="${tattoo.image_url}" alt="${tattoo.title}" class="tattoo-image" style="filter: none;" onerror="this.src='/images/placeholder.jpg'">
+              <div class="tattoo-info">
+                <div class="tattoo-title">${tattoo.title}</div>
+                <div class="tattoo-category">${tattoo.category}</div>
+                <p style="color: #888; font-size: 0.85rem; margin: 0.5rem 0;">${tattoo.description || 'No description'}</p>
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                  <button class="btn btn-secondary btn-small" onclick="editTattoo(${tattoo.id})" style="flex: 1;">Edit</button>
+                  <button class="btn btn-danger btn-small" onclick="deleteTattoo(${tattoo.id})" style="flex: 1;">Delete</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Open add modal
+    function openAddModal() {
+      isEditMode = false;
+      document.getElementById('modalTitle').textContent = 'Add New Tattoo';
+      document.getElementById('tattooForm').reset();
+      document.getElementById('tattooId').value = '';
+      document.getElementById('imagePreview').style.display = 'none';
+      document.getElementById('tattooModal').classList.add('active');
+    }
+
+    // Edit tattoo
+    function editTattoo(id) {
+      const tattoo = tattoos.find(t => t.id === id);
+      if (!tattoo) return;
+
+      isEditMode = true;
+      document.getElementById('modalTitle').textContent = 'Edit Tattoo';
+      document.getElementById('tattooId').value = tattoo.id;
+      document.getElementById('title').value = tattoo.title;
+      document.getElementById('category').value = tattoo.category;
+      document.getElementById('description').value = tattoo.description || '';
+
+      // Show current image
+      if (tattoo.image_url) {
+        document.getElementById('previewImg').src = tattoo.image_url;
+        document.getElementById('imagePreview').style.display = 'block';
+      }
+
+      document.getElementById('tattooModal').classList.add('active');
+    }
+
+    // Delete tattoo
+    async function deleteTattoo(id) {
+      if (!confirm('Are you sure you want to delete this tattoo design? This action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/tattoos/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          alert('Tattoo deleted successfully!');
+          loadTattoos();
+        } else {
+          const data = await response.json();
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('An error occurred. Please try again.');
+      }
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('tattooModal').classList.remove('active');
+    }
+
+    // Image preview
+    document.getElementById('image').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('previewImg').src = e.target.result;
+          document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Submit form
+    document.getElementById('tattooForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      formData.append('title', document.getElementById('title').value);
+      formData.append('category', document.getElementById('category').value);
+      formData.append('description', document.getElementById('description').value);
+
+      const imageFile = document.getElementById('image').files[0];
+      if (imageFile) {
+        formData.append('image', imageFile);
+      } else if (!isEditMode) {
+        alert('Please select an image for the tattoo');
+        return;
+      }
+
+      try {
+        const tattooId = document.getElementById('tattooId').value;
+        const url = isEditMode ? `/api/tattoos/${tattooId}` : '/api/tattoos';
+        const method = isEditMode ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+          method: method,
+          body: formData
+        });
+
+        if (response.ok) {
+          alert(`Tattoo ${isEditMode ? 'updated' : 'created'} successfully!`);
+          closeModal();
+          loadTattoos();
+        } else {
+          const data = await response.json();
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('An error occurred. Please try again.');
+      }
+    });
+
+    // Close modal on outside click
+    document.getElementById('tattooModal').addEventListener('click', (e) => {
+      if (e.target.id === 'tattooModal') {
+        closeModal();
+      }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await logout();
+    });
+
+    // Initialize
+    loadTattoos();
+  </script>
+</body>
+</html>

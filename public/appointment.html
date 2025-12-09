@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Appointment - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK</a>
+    <ul class="navbar-menu">
+      <li><a href="/user-dashboard.html">Dashboard</a></li>
+      <li><a href="/gallery.html">Browse Tattoos</a></li>
+      <li><a href="/my-appointments.html">My Appointments</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/user-dashboard.html">🏠 Dashboard</a></li>
+        <li><a href="/gallery.html">🎨 Browse Tattoos</a></li>
+        <li><a href="/appointment.html" class="active">📅 Make Appointment</a></li>
+        <li><a href="/my-appointments.html">📋 My Appointments</a></li>
+        <li><a href="/notifications.html">🔔 Notifications</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Book Appointment</h1>
+        <p style="color: #aaa;">Fill out the form below to schedule your tattoo session</p>
+      </div>
+
+      <div class="card" style="max-width: 800px;">
+        <div id="message"></div>
+
+        <form id="appointmentForm">
+          <!-- Artist Selection -->
+          <div class="form-group">
+            <label for="artistId">Choose Your Artist</label>
+            <select id="artistId" name="artistId" class="form-control" required>
+              <option value="">-- Select an Artist --</option>
+            </select>
+          </div>
+
+          <!-- Tattoo Selection -->
+          <div class="form-group">
+            <label>Tattoo Design</label>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="radio" name="designType" value="gallery" checked style="margin-right: 0.5rem;">
+                Gallery Design
+              </label>
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="radio" name="designType" value="custom" style="margin-right: 0.5rem;">
+                Upload Custom Design
+              </label>
+            </div>
+
+            <!-- Gallery Design Selection -->
+            <div id="galleryDesignSection">
+              <select id="tattooId" name="tattooId" class="form-control">
+                <option value="">-- Select a Tattoo from Gallery --</option>
+              </select>
+              <small class="form-text">Or <a href="/gallery.html" style="color: var(--gold);">browse the gallery</a> to select a design</small>
+            </div>
+
+            <!-- Custom Design Upload -->
+            <div id="customDesignSection" style="display: none;">
+              <div class="file-upload" id="fileUploadArea">
+                <input type="file" id="customDesign" name="customDesign" accept="image/*">
+                <label for="customDesign" class="file-upload-label">
+                  <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
+                  <div>Click to upload your custom design</div>
+                  <small style="color: #888; margin-top: 0.5rem; display: block;">Supports: JPG, PNG, GIF (Max 5MB)</small>
+                </label>
+              </div>
+              <div id="imagePreview" style="display: none; text-align: center; margin-top: 1rem;">
+                <img id="previewImg" class="file-preview" alt="Preview">
+                <button type="button" class="btn btn-danger btn-small" onclick="removeImage()" style="margin-top: 1rem;">Remove Image</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Date and Time -->
+          <div class="form-group">
+            <label for="appointmentDate">Appointment Date</label>
+            <input type="date" id="appointmentDate" name="appointmentDate" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label for="appointmentTime">Appointment Time</label>
+            <select id="appointmentTime" name="appointmentTime" class="form-control" required>
+              <option value="">-- Select Time --</option>
+              <option value="09:00">09:00 AM</option>
+              <option value="10:00">10:00 AM</option>
+              <option value="11:00">11:00 AM</option>
+              <option value="12:00">12:00 PM</option>
+              <option value="13:00">01:00 PM</option>
+              <option value="14:00">02:00 PM</option>
+              <option value="15:00">03:00 PM</option>
+              <option value="16:00">04:00 PM</option>
+              <option value="17:00">05:00 PM</option>
+            </select>
+          </div>
+
+          <!-- Notes -->
+          <div class="form-group">
+            <label for="notes">Additional Notes (Optional)</label>
+            <textarea id="notes" name="notes" class="form-control" rows="4" placeholder="Any specific requirements or preferences..."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Appointment Request</button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAuth();
+
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('appointmentDate').setAttribute('min', today);
+
+    // Load artists
+    async function loadArtists() {
+      try {
+        const response = await fetch('/api/artists');
+        const artists = await response.json();
+
+        const select = document.getElementById('artistId');
+        artists.forEach(artist => {
+          const option = document.createElement('option');
+          option.value = artist.id;
+          option.textContent = `${artist.name} - ${artist.specialization}`;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading artists:', error);
+      }
+    }
+
+    // Load tattoos
+    async function loadTattoos() {
+      try {
+        const response = await fetch('/api/tattoos');
+        const tattoos = await response.json();
+
+        const select = document.getElementById('tattooId');
+        tattoos.forEach(tattoo => {
+          const option = document.createElement('option');
+          option.value = tattoo.id;
+          option.textContent = `${tattoo.title} (${tattoo.category})`;
+          select.appendChild(option);
+        });
+
+        // Check if there's a selected tattoo from gallery
+        const selectedTattooId = localStorage.getItem('selectedTattooId');
+        if (selectedTattooId) {
+          select.value = selectedTattooId;
+        }
+      } catch (error) {
+        console.error('Error loading tattoos:', error);
+      }
+    }
+
+    // Toggle design type
+    document.querySelectorAll('input[name="designType"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (e.target.value === 'gallery') {
+          document.getElementById('galleryDesignSection').style.display = 'block';
+          document.getElementById('customDesignSection').style.display = 'none';
+          document.getElementById('tattooId').required = true;
+          document.getElementById('customDesign').required = false;
+        } else {
+          document.getElementById('galleryDesignSection').style.display = 'none';
+          document.getElementById('customDesignSection').style.display = 'block';
+          document.getElementById('tattooId').required = false;
+          document.getElementById('customDesign').required = true;
+        }
+      });
+    });
+
+    // Image preview
+    document.getElementById('customDesign').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('previewImg').src = e.target.result;
+          document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Remove image
+    function removeImage() {
+      document.getElementById('customDesign').value = '';
+      document.getElementById('imagePreview').style.display = 'none';
+    }
+
+    // Submit form
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      const designType = document.querySelector('input[name="designType"]:checked').value;
+
+      formData.append('artistId', document.getElementById('artistId').value);
+      formData.append('appointmentDate', document.getElementById('appointmentDate').value);
+      formData.append('appointmentTime', document.getElementById('appointmentTime').value);
+      formData.append('notes', document.getElementById('notes').value);
+
+      if (designType === 'gallery') {
+        const tattooId = document.getElementById('tattooId').value;
+        if (!tattooId) {
+          showMessage('Please select a tattoo design', 'error');
+          return;
+        }
+        formData.append('tattooId', tattooId);
+      } else {
+        const customDesign = document.getElementById('customDesign').files[0];
+        if (!customDesign) {
+          showMessage('Please upload a custom design', 'error');
+          return;
+        }
+        formData.append('customDesign', customDesign);
+      }
+
+      try {
+        const response = await fetch('/api/appointments', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showMessage('Appointment request submitted successfully! Redirecting...', 'success');
+          localStorage.removeItem('selectedTattooId'); // Clear selected tattoo
+          setTimeout(() => {
+            window.location.href = '/my-appointments.html';
+          }, 2000);
+        } else {
+          showMessage(data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('An error occurred. Please try again.', 'error');
+      }
+    });
+
+    function showMessage(message, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+      messageDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    // Initialize
+    loadArtists();
+    loadTattoos();
+  </script>
+</body>
+</html>

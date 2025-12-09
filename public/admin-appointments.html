@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Appointments - J'INK Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK Admin</a>
+    <ul class="navbar-menu">
+      <li><a href="/admin-dashboard.html">Admin Dashboard</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/admin-dashboard.html">📊 Dashboard</a></li>
+        <li><a href="/admin-appointments.html" class="active">📅 Appointments</a></li>
+        <li><a href="/admin-tattoos.html">🎨 Tattoo Designs</a></li>
+        <li><a href="/admin-artists.html">👨‍🎨 Artists</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Manage Appointments</h1>
+        <p style="color: #aaa;">View and manage all customer appointments</p>
+      </div>
+
+      <!-- Filter Section -->
+      <div class="card">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-secondary btn-small filter-status active" data-status="all">All</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="pending">Pending</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="approved">Approved</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="declined">Declined</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="completed">Completed</button>
+        </div>
+      </div>
+
+      <!-- Appointments Table -->
+      <div id="appointmentsList">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Appointment Detail Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h2 class="modal-title">Appointment Details</h2>
+      <div id="modalContent"></div>
+      <div id="modalActions" style="margin-top: 2rem; display: flex; gap: 1rem;"></div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAdminAuth();
+
+    let allAppointments = [];
+
+    // Load appointments
+    async function loadAppointments() {
+      try {
+        const response = await fetch('/api/appointments');
+        allAppointments = await response.json();
+        displayAppointments(allAppointments);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        document.getElementById('appointmentsList').innerHTML = '<p style="color: #dc3545;">Failed to load appointments</p>';
+      }
+    }
+
+    // Display appointments
+    function displayAppointments(appointments) {
+      const container = document.getElementById('appointmentsList');
+
+      if (appointments.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-text">No appointments found</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Contact</th>
+                <th>Artist</th>
+                <th>Date & Time</th>
+                <th>Design</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${appointments.map(appt => `
+                <tr>
+                  <td>#${appt.id}</td>
+                  <td>${appt.first_name} ${appt.last_name}<br><small style="color: #888;">@${appt.username}</small></td>
+                  <td>${appt.email}</td>
+                  <td>${appt.artist_name}</td>
+                  <td>${new Date(appt.appointment_date).toLocaleDateString()}<br>${appt.appointment_time}</td>
+                  <td>${appt.tattoo_title || '<span style="color: var(--gold);">Custom</span>'}</td>
+                  <td><span class="status-badge status-${appt.status}">${appt.status}</span></td>
+                  <td>
+                    <button class="btn btn-secondary btn-small" onclick="viewDetails(${appt.id})" style="margin-bottom: 0.5rem;">View</button><br>
+                    ${appt.status === 'pending' ? `
+                      <button class="btn btn-success btn-small" onclick="updateStatus(${appt.id}, 'approved')" style="margin-right: 0.3rem;">✓</button>
+                      <button class="btn btn-danger btn-small" onclick="updateStatus(${appt.id}, 'declined')">✗</button>
+                    ` : appt.status === 'approved' ? `
+                      <button class="btn btn-primary btn-small" onclick="updateStatus(${appt.id}, 'completed')">Complete</button>
+                    ` : '-'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // View appointment details
+    function viewDetails(id) {
+      const appointment = allAppointments.find(a => a.id === id);
+      if (!appointment) return;
+
+      const modalContent = document.getElementById('modalContent');
+      modalContent.innerHTML = `
+        <div style="line-height: 2;">
+          <p><strong style="color: var(--gold);">Appointment ID:</strong> #${appointment.id}</p>
+          <p><strong style="color: var(--gold);">Customer:</strong> ${appointment.first_name} ${appointment.last_name} (@${appointment.username})</p>
+          <p><strong style="color: var(--gold);">Email:</strong> ${appointment.email}</p>
+          <p><strong style="color: var(--gold);">Date:</strong> ${new Date(appointment.appointment_date).toLocaleDateString()}</p>
+          <p><strong style="color: var(--gold);">Time:</strong> ${appointment.appointment_time}</p>
+          <p><strong style="color: var(--gold);">Artist:</strong> ${appointment.artist_name}</p>
+          <p><strong style="color: var(--gold);">Design:</strong> ${appointment.tattoo_title || 'Custom Design'}</p>
+          <p><strong style="color: var(--gold);">Status:</strong> <span class="status-badge status-${appointment.status}">${appointment.status}</span></p>
+          ${appointment.notes ? `<p><strong style="color: var(--gold);">Notes:</strong><br>${appointment.notes}</p>` : ''}
+          ${appointment.custom_design_url ? `
+            <div style="margin-top: 1rem;">
+              <strong style="color: var(--gold);">Custom Design:</strong><br>
+              <img src="${appointment.custom_design_url}" alt="Custom Design" style="max-width: 100%; max-height: 300px; border: 2px solid var(--gold); border-radius: 8px; margin-top: 0.5rem;">
+            </div>
+          ` : ''}
+          <p style="margin-top: 1rem;"><small style="color: #888;">Submitted on: ${new Date(appointment.created_at).toLocaleString()}</small></p>
+        </div>
+      `;
+
+      const modalActions = document.getElementById('modalActions');
+      if (appointment.status === 'pending') {
+        modalActions.innerHTML = `
+          <button class="btn btn-success" onclick="updateStatusAndClose(${appointment.id}, 'approved')">Approve</button>
+          <button class="btn btn-danger" onclick="updateStatusAndClose(${appointment.id}, 'declined')">Decline</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        `;
+      } else if (appointment.status === 'approved') {
+        modalActions.innerHTML = `
+          <button class="btn btn-primary" onclick="updateStatusAndClose(${appointment.id}, 'completed')">Mark as Completed</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        `;
+      } else {
+        modalActions.innerHTML = `
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        `;
+      }
+
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.remove('active');
+    }
+
+    // Update appointment status
+    async function updateStatus(id, status) {
+      if (!confirm(`Are you sure you want to ${status} this appointment?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/appointments/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+
+        if (response.ok) {
+          alert('Appointment status updated successfully!');
+          loadAppointments();
+        } else {
+          const data = await response.json();
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('An error occurred. Please try again.');
+      }
+    }
+
+    // Update status and close modal
+    async function updateStatusAndClose(id, status) {
+      await updateStatus(id, status);
+      closeModal();
+    }
+
+    // Filter appointments
+    document.querySelectorAll('.filter-status').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-status').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const status = btn.dataset.status;
+        if (status === 'all') {
+          displayAppointments(allAppointments);
+        } else {
+          const filtered = allAppointments.filter(a => a.status === status);
+          displayAppointments(filtered);
+        }
+      });
+    });
+
+    // Close modal on outside click
+    document.getElementById('detailModal').addEventListener('click', (e) => {
+      if (e.target.id === 'detailModal') {
+        closeModal();
+      }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await logout();
+    });
+
+    // Initialize
+    loadAppointments();
+  </script>
+</body>
+</html>

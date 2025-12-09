@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tattoo Gallery - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK</a>
+    <ul class="navbar-menu">
+      <li><a href="/user-dashboard.html">Dashboard</a></li>
+      <li><a href="/gallery.html" class="active">Browse Tattoos</a></li>
+      <li><a href="/my-appointments.html">My Appointments</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/user-dashboard.html">🏠 Dashboard</a></li>
+        <li><a href="/gallery.html" class="active">🎨 Browse Tattoos</a></li>
+        <li><a href="/appointment.html">📅 Make Appointment</a></li>
+        <li><a href="/my-appointments.html">📋 My Appointments</a></li>
+        <li><a href="/notifications.html">🔔 Notifications</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Tattoo Gallery</h1>
+        <p style="color: #aaa;">Browse our collection and select your favorite design</p>
+      </div>
+
+      <!-- Filter Section -->
+      <div class="card">
+        <h2 class="card-title">Filter by Category</h2>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-secondary btn-small filter-btn active" data-category="all">All Tattoos</button>
+          <button class="btn btn-secondary btn-small filter-btn" data-category="Arm">Arm</button>
+          <button class="btn btn-secondary btn-small filter-btn" data-category="Back">Back</button>
+          <button class="btn btn-secondary btn-small filter-btn" data-category="Chest">Chest</button>
+          <button class="btn btn-secondary btn-small filter-btn" data-category="Shoulder">Shoulder</button>
+          <button class="btn btn-secondary btn-small filter-btn" data-category="Wrist">Wrist</button>
+        </div>
+      </div>
+
+      <!-- Selected Tattoo Info -->
+      <div id="selectedInfo" style="display: none;" class="card" style="background: linear-gradient(135deg, var(--gold) 0%, #c9a02e 100%); color: var(--dark);">
+        <h3 style="margin-bottom: 0.5rem;">Selected: <span id="selectedTattooName"></span></h3>
+        <p style="margin-bottom: 1rem;">Category: <span id="selectedTattooCategory"></span></p>
+        <a href="/appointment.html" class="btn btn-primary" style="background: var(--dark); color: var(--gold);">Book This Tattoo</a>
+      </div>
+
+      <!-- Gallery Grid -->
+      <div id="tattooGallery">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAuth();
+
+    let allTattoos = [];
+    let selectedTattooId = null;
+
+    // Load tattoos
+    async function loadTattoos() {
+      try {
+        const response = await fetch('/api/tattoos');
+        allTattoos = await response.json();
+        displayTattoos(allTattoos);
+      } catch (error) {
+        console.error('Error loading tattoos:', error);
+        document.getElementById('tattooGallery').innerHTML = '<p style="color: #dc3545;">Failed to load tattoos</p>';
+      }
+    }
+
+    // Display tattoos
+    function displayTattoos(tattoos) {
+      const container = document.getElementById('tattooGallery');
+
+      if (tattoos.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎨</div>
+            <div class="empty-state-text">No tattoos found</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="tattoo-grid">
+          ${tattoos.map(tattoo => `
+            <div class="tattoo-card ${selectedTattooId === tattoo.id ? 'selected' : ''}" data-id="${tattoo.id}" onclick="selectTattoo(${tattoo.id})">
+              ${selectedTattooId === tattoo.id ? '<div class="selected-badge">SELECTED</div>' : ''}
+              <img src="${tattoo.image_url}" alt="${tattoo.title}" class="tattoo-image" onerror="this.src='/images/placeholder.jpg'">
+              <div class="tattoo-info">
+                <div class="tattoo-title">${tattoo.title}</div>
+                <div class="tattoo-category">${tattoo.category}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Select tattoo
+    function selectTattoo(id) {
+      const tattoo = allTattoos.find(t => t.id === id);
+      if (!tattoo) return;
+
+      selectedTattooId = id;
+      localStorage.setItem('selectedTattooId', id);
+
+      // Update selected info
+      document.getElementById('selectedInfo').style.display = 'block';
+      document.getElementById('selectedTattooName').textContent = tattoo.title;
+      document.getElementById('selectedTattooCategory').textContent = tattoo.category;
+
+      // Re-render to update selected state
+      displayTattoos(allTattoos);
+    }
+
+    // Filter tattoos
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Update active button
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const category = btn.dataset.category;
+        if (category === 'all') {
+          displayTattoos(allTattoos);
+        } else {
+          const filtered = allTattoos.filter(t => t.category === category);
+          displayTattoos(filtered);
+        }
+      });
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    // Check if there's a selected tattoo from previous session
+    const savedTattooId = localStorage.getItem('selectedTattooId');
+    if (savedTattooId) {
+      selectedTattooId = parseInt(savedTattooId);
+    }
+
+    // Initialize
+    loadTattoos();
+  </script>
+</body>
+</html>

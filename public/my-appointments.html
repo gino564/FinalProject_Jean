@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Appointments - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK</a>
+    <ul class="navbar-menu">
+      <li><a href="/user-dashboard.html">Dashboard</a></li>
+      <li><a href="/gallery.html">Browse Tattoos</a></li>
+      <li><a href="/my-appointments.html" class="active">My Appointments</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/user-dashboard.html">🏠 Dashboard</a></li>
+        <li><a href="/gallery.html">🎨 Browse Tattoos</a></li>
+        <li><a href="/appointment.html">📅 Make Appointment</a></li>
+        <li><a href="/my-appointments.html" class="active">📋 My Appointments</a></li>
+        <li><a href="/notifications.html">🔔 Notifications</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">My Appointments</h1>
+        <p style="color: #aaa;">Track and manage your tattoo appointments</p>
+      </div>
+
+      <!-- Filter Section -->
+      <div class="card">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+          <button class="btn btn-secondary btn-small filter-status active" data-status="all">All</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="pending">Pending</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="approved">Approved</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="declined">Declined</button>
+          <button class="btn btn-secondary btn-small filter-status" data-status="completed">Completed</button>
+          <div style="margin-left: auto;">
+            <a href="/appointment.html" class="btn btn-primary">Book New Appointment</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appointments List -->
+      <div id="appointmentsList">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Appointment Detail Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h2 class="modal-title">Appointment Details</h2>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    checkAuth();
+
+    let allAppointments = [];
+
+    // Load appointments
+    async function loadAppointments() {
+      try {
+        const response = await fetch('/api/appointments/my');
+        allAppointments = await response.json();
+        displayAppointments(allAppointments);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        document.getElementById('appointmentsList').innerHTML = '<p style="color: #dc3545;">Failed to load appointments</p>';
+      }
+    }
+
+    // Display appointments
+    function displayAppointments(appointments) {
+      const container = document.getElementById('appointmentsList');
+
+      if (appointments.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-text">No appointments found</div>
+            <a href="/appointment.html" class="btn btn-primary">Book Your First Appointment</a>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Artist</th>
+                <th>Design</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${appointments.map(appt => `
+                <tr>
+                  <td>#${appt.id}</td>
+                  <td>${new Date(appt.appointment_date).toLocaleDateString()}</td>
+                  <td>${appt.appointment_time}</td>
+                  <td>${appt.artist_name}<br><small style="color: #888;">${appt.artist_specialization}</small></td>
+                  <td>${appt.tattoo_title || '<span style="color: var(--gold);">Custom Design</span>'}</td>
+                  <td><span class="status-badge status-${appt.status}">${appt.status}</span></td>
+                  <td>
+                    <button class="btn btn-secondary btn-small" onclick="viewDetails(${appt.id})">View</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // View appointment details
+    function viewDetails(id) {
+      const appointment = allAppointments.find(a => a.id === id);
+      if (!appointment) return;
+
+      const modalContent = document.getElementById('modalContent');
+      modalContent.innerHTML = `
+        <div style="line-height: 2;">
+          <p><strong style="color: var(--gold);">Appointment ID:</strong> #${appointment.id}</p>
+          <p><strong style="color: var(--gold);">Date:</strong> ${new Date(appointment.appointment_date).toLocaleDateString()}</p>
+          <p><strong style="color: var(--gold);">Time:</strong> ${appointment.appointment_time}</p>
+          <p><strong style="color: var(--gold);">Artist:</strong> ${appointment.artist_name}</p>
+          <p><strong style="color: var(--gold);">Specialization:</strong> ${appointment.artist_specialization}</p>
+          <p><strong style="color: var(--gold);">Design:</strong> ${appointment.tattoo_title || 'Custom Design'}</p>
+          <p><strong style="color: var(--gold);">Status:</strong> <span class="status-badge status-${appointment.status}">${appointment.status}</span></p>
+          ${appointment.notes ? `<p><strong style="color: var(--gold);">Notes:</strong><br>${appointment.notes}</p>` : ''}
+          ${appointment.tattoo_image ? `
+            <div style="margin-top: 1rem;">
+              <strong style="color: var(--gold);">Design Preview:</strong><br>
+              <img src="${appointment.tattoo_image}" alt="Tattoo" style="max-width: 100%; max-height: 300px; border: 2px solid var(--gold); border-radius: 8px; margin-top: 0.5rem;">
+            </div>
+          ` : ''}
+          ${appointment.custom_design_url ? `
+            <div style="margin-top: 1rem;">
+              <strong style="color: var(--gold);">Custom Design:</strong><br>
+              <img src="${appointment.custom_design_url}" alt="Custom Design" style="max-width: 100%; max-height: 300px; border: 2px solid var(--gold); border-radius: 8px; margin-top: 0.5rem;">
+            </div>
+          ` : ''}
+          <p style="margin-top: 1rem;"><small style="color: #888;">Submitted on: ${new Date(appointment.created_at).toLocaleString()}</small></p>
+        </div>
+      `;
+
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.remove('active');
+    }
+
+    // Filter appointments
+    document.querySelectorAll('.filter-status').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-status').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const status = btn.dataset.status;
+        if (status === 'all') {
+          displayAppointments(allAppointments);
+        } else {
+          const filtered = allAppointments.filter(a => a.status === status);
+          displayAppointments(filtered);
+        }
+      });
+    });
+
+    // Close modal on outside click
+    document.getElementById('detailModal').addEventListener('click', (e) => {
+      if (e.target.id === 'detailModal') {
+        closeModal();
+      }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    // Initialize
+    loadAppointments();
+  </script>
+</body>
+</html>

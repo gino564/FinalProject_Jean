@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - J'INK Tattoo Studio</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/index.html" class="navbar-brand">J'INK Admin</a>
+    <ul class="navbar-menu">
+      <li><a href="/admin-dashboard.html" class="active">Admin Dashboard</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="/admin-dashboard.html" class="active">📊 Dashboard</a></li>
+        <li><a href="/admin-appointments.html">📅 Appointments</a></li>
+        <li><a href="/admin-tattoos.html">🎨 Tattoo Designs</a></li>
+        <li><a href="/admin-artists.html">👨‍🎨 Artists</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">Admin Dashboard</h1>
+        <p style="color: #aaa;">Overview of studio operations and analytics</p>
+      </div>
+
+      <!-- Statistics Cards -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-value" id="todayAppointments">-</div>
+          <div class="stat-label">Today's Appointments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="pendingAppointments">-</div>
+          <div class="stat-label">Pending Approvals</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="popularCategory">-</div>
+          <div class="stat-label">Popular Category</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="mostBookedArtist">-</div>
+          <div class="stat-label">Most Booked Artist</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <h2 class="card-title">Quick Actions</h2>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <a href="/admin-appointments.html" class="btn btn-primary">Manage Appointments</a>
+          <a href="/admin-tattoos.html" class="btn btn-secondary">Add New Tattoo</a>
+          <a href="/admin-artists.html" class="btn btn-secondary">Add New Artist</a>
+        </div>
+      </div>
+
+      <!-- Recent Appointments -->
+      <div class="card">
+        <h2 class="card-title">Recent Appointment Requests</h2>
+        <div id="recentAppointments">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // Check admin authentication
+    checkAdminAuth();
+
+    // Load statistics
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/admin/stats');
+        const stats = await response.json();
+
+        document.getElementById('todayAppointments').textContent = stats.todayAppointments;
+        document.getElementById('pendingAppointments').textContent = stats.pendingAppointments;
+        document.getElementById('popularCategory').textContent = stats.popularCategory;
+        document.getElementById('mostBookedArtist').textContent = stats.mostBookedArtist;
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    // Load recent appointments
+    async function loadRecentAppointments() {
+      try {
+        const response = await fetch('/api/appointments');
+        const appointments = await response.json();
+
+        const container = document.getElementById('recentAppointments');
+
+        if (appointments.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📅</div>
+              <div class="empty-state-text">No appointments yet</div>
+            </div>
+          `;
+        } else {
+          const recentAppts = appointments.slice(0, 5);
+          container.innerHTML = `
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Artist</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentAppts.map(appt => `
+                    <tr>
+                      <td>#${appt.id}</td>
+                      <td>${appt.first_name} ${appt.last_name}<br><small style="color: #888;">${appt.email}</small></td>
+                      <td>${appt.artist_name}</td>
+                      <td>${new Date(appt.appointment_date).toLocaleDateString()}</td>
+                      <td>${appt.appointment_time}</td>
+                      <td><span class="status-badge status-${appt.status}">${appt.status}</span></td>
+                      <td>
+                        ${appt.status === 'pending' ? `
+                          <button class="btn btn-success btn-small" onclick="updateStatus(${appt.id}, 'approved')" style="margin-right: 0.5rem;">Approve</button>
+                          <button class="btn btn-danger btn-small" onclick="updateStatus(${appt.id}, 'declined')">Decline</button>
+                        ` : '-'}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        document.getElementById('recentAppointments').innerHTML = '<p style="color: #dc3545;">Failed to load appointments</p>';
+      }
+    }
+
+    // Update appointment status
+    async function updateStatus(id, status) {
+      if (!confirm(`Are you sure you want to ${status} this appointment?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/appointments/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+
+        if (response.ok) {
+          alert('Appointment status updated successfully!');
+          loadRecentAppointments();
+          loadStats(); // Refresh stats
+        } else {
+          const data = await response.json();
+          alert('Error: ' + data.error);
+        }
+      } catch (error) {
+        alert('An error occurred. Please try again.');
+      }
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await logout();
+    });
+
+    // Initialize
+    loadStats();
+    loadRecentAppointments();
+  </script>
+</body>
+</html>
